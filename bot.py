@@ -62,7 +62,7 @@ def buscar_pedidos(fecha):
 
         df = tablas[0]
 
-        archivo = "pedidos.xlsx"
+        archivo = f"pedidos_{fecha}.xlsx"
 
         df.to_excel(archivo, index=False)
 
@@ -89,7 +89,7 @@ async def iniciar_pedidos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def recibir_fecha(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    fecha = update.message.text
+    fecha = update.message.text.strip()
 
     await update.message.reply_text("🔎 Buscando pedidos...")
 
@@ -101,7 +101,8 @@ async def recibir_fecha(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
 
-    await update.message.reply_document(document=open(archivo, "rb"))
+    with open(archivo, "rb") as f:
+        await update.message.reply_document(document=f)
 
     return ConversationHandler.END
 
@@ -116,7 +117,7 @@ async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -------- INICIAR BOT --------
 
 
-if __name__ == "__main__":
+async def main():
 
     print("BOT INICIADO")
 
@@ -134,4 +135,12 @@ if __name__ == "__main__":
 
     app.add_handler(conv_handler)
 
-    app.run_polling()
+    # evita conflictos de instancias y limpia updates antiguos
+    await app.bot.delete_webhook(drop_pending_updates=True)
+
+    await app.run_polling()
+
+
+if __name__ == "__main__":
+    import asyncio
+    asyncio.run(main())
