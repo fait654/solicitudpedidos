@@ -1,22 +1,21 @@
 import os
-from telegram import Update
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ConversationHandler,
-    ContextTypes,
-    filters,
-)
+from flask import Flask, request
+from telegram import Bot, Update
+from telegram.ext import Dispatcher, MessageHandler, filters
+from telegram.ext import CommandHandler, ConversationHandler, ContextTypes
 from playwright.sync_api import sync_playwright
 import pandas as pd
-import re
+
+# ---------- CONFIG ----------
 
 TOKEN = os.getenv("BOT_TOKEN")
+bot = Bot(token=TOKEN)
+app = Flask(__name__)
 
 PEDIR_FECHA = 1
 
-# -------- FUNCION BUSCAR PEDIDOS --------
+# ---------- FUNCION BUSCAR PEDIDOS ----------
+
 def buscar_pedidos(fecha):
     try:
         with sync_playwright() as p:
@@ -24,8 +23,8 @@ def buscar_pedidos(fecha):
             page = browser.new_page()
 
             print("Abriendo login...")
-
             page.goto("https://myeforce.ecom.com.co/ecomltda/")
+
             page.fill('input[name="cta"]', "ebrandy@esparta")
             page.fill('input[name="ingr"]', "Pedidosesparta2026.")
             page.click('button[type="submit"]')
@@ -57,67 +56,59 @@ def buscar_pedidos(fecha):
         print("ERROR:", e)
         return None
 
-# -------- HANDLERS --------
-async def iniciar_pedidos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# ---------- HANDLERS ----------
+
+async def start_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "📅 ¿De qué fecha deseas obtener los pedidos?\n\nEjemplo: 2026-03-05"
+        "Hola 👋, envíame cualquier fecha para obtener los pedidos.\nEjemplo: 2026-03-05"
     )
     return PEDIR_FECHA
 
 async def recibir_fecha(update: Update, context: ContextTypes.DEFAULT_TYPE):
     fecha = update.message.text.strip()
-
-    # Validar formato de fecha YYYY-MM-DD
-    if not re.match(r"\d{4}-\d{2}-\d{2}", fecha):
-        await update.message.reply_text("❌ Formato de fecha inválido. Usa YYYY-MM-DD")
-        return PEDIR_FECHA
-
     await update.message.reply_text("🔎 Buscando pedidos...")
-
     archivo = buscar_pedidos(fecha)
     if archivo is None:
-        await update.message.reply_text(
-            "❌ No se encontraron pedidos o ocurrió un error."
-        )
+        await update.message.reply_text("❌ No se encontraron pedidos o ocurrió un error.")
         return ConversationHandler.END
-
     with open(archivo, "rb") as f:
         await update.message.reply_document(document=f)
-
     return ConversationHandler.END
 
-async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Operación cancelada.")
     return ConversationHandler.END
 
-# -------- HANDLER GLOBAL PARA CUALQUIER MENSAJE --------
-async def manejar_cualquier_mensaje(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    texto = update.message.text.strip()
+# ---------- DISPACHER ----------
 
-    # Si el mensaje es una fecha válida, buscar pedidos directamente
-    if re.match(r"\d{4}-\d{2}-\d{2}", texto):
-        await recibir_fecha(update, context)
-    else:
-        await update.message.reply_text(
-            "🤖 Hola! Para obtener pedidos escribe la fecha en formato YYYY-MM-DD.\nEjemplo: 2026-03-05"
-        )
+dispatcher = Dispatcher(bot, None, workers=0, use_context=True)
 
-# -------- INICIAR BOT --------
-def main():
-    print("BOT INICIADO")
-    app = ApplicationBuilder().token(TOKEN).build()
+conv_handler = ConversationHandler(
+    entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_fecha)],
+    states={
+        PEDIR_FECHA: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_fecha)
+        ]
+    },
+    fallbacks=[CommandHandler("cancelar", cancel)],
+)
 
-    conv_handler = ConversationHandler(
-        entry_points=[CommandHandler("pedidos", iniciar_pedidos)],
-        states={PEDIR_FECHA: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_fecha)]},
-        fallbacks=[CommandHandler("cancelar", cancelar)],
-    )
-    app.add_handler(conv_handler)
+dispatcher.add_handler(CommandHandler("start", start_handler))
+dispatcher.add_handler(conv_handler)
 
-    # Handler global para cualquier mensaje
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, manejar_cualquier_mensaje))
+# ---------- FLASK WEBHOOK ----------
 
-    app.run_polling()
+@app.route(f"/{TOKEN}", methods=["POST"])
+def webhook():
+    update = Update.de_json(request.get_json(force=True), bot)
+    dispatcher.process_update(update)
+    return "ok"
+
+@app.route("/")
+def index():
+    return "Bot activo!"
+
+# ---------- RUN ----------
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
