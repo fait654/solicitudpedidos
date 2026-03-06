@@ -1,9 +1,10 @@
+import os
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
 from playwright.sync_api import sync_playwright
 import pandas as pd
 
-TOKEN = "8786369392:AAFi1P9JQnijnXLXe2vZ9kyLYN4yBC0lVJg"
+TOKEN = os.getenv("BOT_TOKEN")
 
 
 def buscar_pedidos(fecha):
@@ -13,7 +14,6 @@ def buscar_pedidos(fecha):
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
-        # abrir login
         page.goto("https://myeforce.ecom.com.co/ecomltda/")
 
         # login
@@ -33,10 +33,8 @@ def buscar_pedidos(fecha):
         page.fill('input[name="fecha_ini"]', fecha)
         page.fill('input[name="fecha_fin"]', fecha)
 
-        # registros
         page.fill('input[name="cantidad"]', "99999")
 
-        # buscar
         page.click('button:has-text("Buscar")')
 
         page.wait_for_timeout(6000)
@@ -45,7 +43,6 @@ def buscar_pedidos(fecha):
 
         browser.close()
 
-    # leer tabla HTML
     tablas = pd.read_html(html)
 
     df = tablas[0]
