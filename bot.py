@@ -16,6 +16,8 @@ TOKEN = os.getenv("BOT_TOKEN")
 PEDIR_FECHA = 1
 
 
+# -------- FUNCION BUSCAR PEDIDOS --------
+
 def buscar_pedidos(fecha):
 
     try:
@@ -117,7 +119,7 @@ async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # -------- INICIAR BOT --------
 
 
-async def main():
+def main():
 
     print("BOT INICIADO")
 
@@ -135,12 +137,11 @@ async def main():
 
     app.add_handler(conv_handler)
 
-    # evita conflictos de instancias y limpia updates antiguos
-    await app.bot.delete_webhook(drop_pending_updates=True)
+    # eliminar webhook si existía
+    app.bot.delete_webhook(drop_pending_updates=True)
 
-    await app.run_polling()
+    app.run_polling()
 
 
 if __name__ == "__main__":
-    import asyncio
-    asyncio.run(main())
+    main()
