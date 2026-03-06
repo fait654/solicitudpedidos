@@ -137,9 +137,6 @@ def main():
 
     app.add_handler(conv_handler)
 
-    # eliminar webhook si existía
-    app.bot.delete_webhook(drop_pending_updates=True)
-
     app.run_polling()
 
 
