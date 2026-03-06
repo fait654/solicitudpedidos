@@ -1,76 +1,137 @@
 import os
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import (
+    ApplicationBuilder,
+    CommandHandler,
+    MessageHandler,
+    ConversationHandler,
+    ContextTypes,
+    filters,
+)
 from playwright.sync_api import sync_playwright
 import pandas as pd
 
 TOKEN = os.getenv("BOT_TOKEN")
 
+PEDIR_FECHA = 1
+
 
 def buscar_pedidos(fecha):
 
-    with sync_playwright() as p:
+    try:
 
-        browser = p.chromium.launch(headless=True)
-        page = browser.new_page()
+        with sync_playwright() as p:
 
-        page.goto("https://myeforce.ecom.com.co/ecomltda/")
+            browser = p.chromium.launch(headless=True)
+            page = browser.new_page()
 
-        # login
-        page.fill('input[name="cta"]', "ebrandy@esparta")
-        page.fill('input[name="ingr"]', "Pedidosesparta2026.")
+            print("Abriendo login...")
 
-        page.click('button[type="submit"]')
+            page.goto("https://myeforce.ecom.com.co/ecomltda/")
 
-        page.wait_for_timeout(5000)
+            page.fill('input[name="cta"]', "ebrandy@esparta")
+            page.fill('input[name="ingr"]', "Pedidosesparta2026.")
 
-        # ir a pedidos
-        page.goto("https://myeforce.ecom.com.co/eforce/modulos/pedidosNew/index.php")
+            page.click('button[type="submit"]')
 
-        page.wait_for_timeout(4000)
+            page.wait_for_timeout(5000)
 
-        # fecha
-        page.fill('input[name="fecha_ini"]', fecha)
-        page.fill('input[name="fecha_fin"]', fecha)
+            print("Login correcto")
 
-        page.fill('input[name="cantidad"]', "99999")
+            page.goto("https://myeforce.ecom.com.co/eforce/modulos/pedidosNew/index.php")
 
-        page.click('button:has-text("Buscar")')
+            page.wait_for_timeout(4000)
 
-        page.wait_for_timeout(6000)
+            page.fill('input[name="fecha_ini"]', fecha)
+            page.fill('input[name="fecha_fin"]', fecha)
 
-        html = page.content()
+            page.fill('input[name="cantidad"]', "99999")
 
-        browser.close()
+            page.click('button:has-text("Buscar")')
 
-    tablas = pd.read_html(html)
+            page.wait_for_timeout(6000)
 
-    df = tablas[0]
+            html = page.content()
 
-    archivo = "pedidos.xlsx"
+            browser.close()
 
-    df.to_excel(archivo, index=False)
+        tablas = pd.read_html(html)
 
-    return archivo
+        if len(tablas) == 0:
+            return None
+
+        df = tablas[0]
+
+        archivo = "pedidos.xlsx"
+
+        df.to_excel(archivo, index=False)
+
+        return archivo
+
+    except Exception as e:
+
+        print("ERROR:", e)
+
+        return None
 
 
-async def pedidos(update: Update, context: ContextTypes.DEFAULT_TYPE):
+# -------- CONVERSACION BOT --------
 
-    if len(context.args) == 0:
-        await update.message.reply_text("Usa: /pedidos 2026-03-05")
-        return
 
-    fecha = context.args[0]
+async def iniciar_pedidos(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    await update.message.reply_text("Buscando pedidos...")
+    await update.message.reply_text(
+        "📅 ¿De qué fecha deseas obtener los pedidos?\n\nEjemplo:\n2026-03-05"
+    )
+
+    return PEDIR_FECHA
+
+
+async def recibir_fecha(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+    fecha = update.message.text
+
+    await update.message.reply_text("🔎 Buscando pedidos...")
 
     archivo = buscar_pedidos(fecha)
 
+    if archivo is None:
+        await update.message.reply_text(
+            "❌ No se encontraron pedidos o ocurrió un error."
+        )
+        return ConversationHandler.END
+
     await update.message.reply_document(document=open(archivo, "rb"))
 
+    return ConversationHandler.END
 
-app = ApplicationBuilder().token(TOKEN).build()
 
-app.add_handler(CommandHandler("pedidos", pedidos))
+async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-app.run_polling()
+    await update.message.reply_text("Operación cancelada.")
+
+    return ConversationHandler.END
+
+
+# -------- INICIAR BOT --------
+
+
+if __name__ == "__main__":
+
+    print("BOT INICIADO")
+
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("pedidos", iniciar_pedidos)],
+        states={
+            PEDIR_FECHA: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_fecha)
+            ]
+        },
+        fallbacks=[CommandHandler("cancelar", cancelar)],
+    )
+
+    app.add_handler(conv_handler)
+
+    app.run_polling()
