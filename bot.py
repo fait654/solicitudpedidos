@@ -98,11 +98,17 @@ def home():
 
 def run_bot():
     print("Bot iniciado...")
-    bot.infinity_polling()
+
+    # limpiar webhook antiguo si existía
+    bot.remove_webhook()
+
+    # iniciar polling evitando conflictos
+    bot.infinity_polling(skip_pending=True)
 
 
 if __name__ == "__main__":
 
+    # iniciar bot en otro hilo
     threading.Thread(target=run_bot).start()
 
     port = int(os.environ.get("PORT", 10000))
