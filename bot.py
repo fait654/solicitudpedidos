@@ -12,9 +12,9 @@ from telegram.ext import (
 from playwright.sync_api import sync_playwright
 import pandas as pd
 
+# ---------------- CONFIG ----------------
 TOKEN = os.getenv("BOT_TOKEN")
 PEDIR_FECHA = 1
-
 app = Flask(__name__)
 
 # -------- FUNCION BUSCAR PEDIDOS --------
@@ -92,7 +92,7 @@ application.add_handler(conv_handler)
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
-    application.update_queue.put_nowait(update)  # <-- importante: put_nowait
+    application.update_queue.put_nowait(update)  # importante: sin polling
     return "ok"
 
 @app.route("/")
@@ -101,5 +101,5 @@ def index():
 
 # -------- RUN LOCAL PARA PRUEBAS --------
 if __name__ == "__main__":
-    # Solo para pruebas locales, comentar en producción
+    # Solo para pruebas locales, comentar en Render
     application.run_polling()
