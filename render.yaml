@@ -2,8 +2,11 @@ services:
   - type: web
     name: solicitudpedidos
     runtime: python
+    plan: starter
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
     buildCommand: |
       pip install -r requirements.txt
       playwright install chromium
     startCommand: python bot.py
-    plan: free
