@@ -1,6 +1,7 @@
 import os
 import telebot
 import threading
+import time
 from flask import Flask
 from playwright.sync_api import sync_playwright
 import pandas as pd
@@ -37,6 +38,7 @@ def buscar_pedidos(fecha):
             page.wait_for_timeout(6000)
 
             html = page.content()
+
             browser.close()
 
         tablas = pd.read_html(html)
@@ -60,6 +62,7 @@ def buscar_pedidos(fecha):
 @bot.message_handler(commands=['start'])
 def start(message):
     esperando_fecha[message.chat.id] = True
+
     bot.send_message(
         message.chat.id,
         "Hola 👋\nEnvíame una fecha para buscar pedidos.\nEjemplo: 2026-03-05"
@@ -87,6 +90,7 @@ def recibir_fecha(message):
         bot.send_document(message.chat.id, f)
 
     os.remove(archivo)
+
     esperando_fecha.pop(message.chat.id, None)
 
 
@@ -96,20 +100,32 @@ def home():
     return "Bot activo"
 
 
+# -------- BOT LOOP SEGURO --------
 def run_bot():
+
     print("Bot iniciado...")
 
-    # limpiar webhook antiguo si existía
     bot.remove_webhook()
 
-    # iniciar polling evitando conflictos
-    bot.infinity_polling(skip_pending=True)
+    while True:
+        try:
+            bot.infinity_polling(
+                timeout=60,
+                long_polling_timeout=60,
+                skip_pending=True
+            )
+        except Exception as e:
+            print("Error en polling:", e)
+            time.sleep(5)
 
 
+# -------- MAIN --------
 if __name__ == "__main__":
 
-    # iniciar bot en otro hilo
-    threading.Thread(target=run_bot).start()
+    # iniciar bot en segundo hilo
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
 
     port = int(os.environ.get("PORT", 10000))
 
