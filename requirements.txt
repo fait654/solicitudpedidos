@@ -1,6 +1,6 @@
-python-telegram-bot==20.6
-flask
-playwright
+pyTelegramBotAPI
+Flask
 pandas
 openpyxl
-lxml
+PyMuPDF
+PyPDF2
