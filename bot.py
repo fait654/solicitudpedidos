@@ -1,11 +1,15 @@
 import os
 import telebot
+import threading
+from flask import Flask
 from playwright.sync_api import sync_playwright
 import pandas as pd
 
 TOKEN = os.getenv("BOT_TOKEN")
 
 bot = telebot.TeleBot(TOKEN)
+
+app = Flask(__name__)
 
 esperando_fecha = {}
 
@@ -52,18 +56,16 @@ def buscar_pedidos(fecha):
         return None
 
 
-# -------- COMANDO START --------
+# -------- BOT --------
 @bot.message_handler(commands=['start'])
 def start(message):
     esperando_fecha[message.chat.id] = True
-
     bot.send_message(
         message.chat.id,
         "Hola 👋\nEnvíame una fecha para buscar pedidos.\nEjemplo: 2026-03-05"
     )
 
 
-# -------- RECIBIR MENSAJES --------
 @bot.message_handler(func=lambda message: True)
 def recibir_fecha(message):
 
@@ -85,10 +87,24 @@ def recibir_fecha(message):
         bot.send_document(message.chat.id, f)
 
     os.remove(archivo)
-
     esperando_fecha.pop(message.chat.id, None)
 
 
-print("Bot iniciado...")
+# -------- FLASK PARA RENDER --------
+@app.route("/")
+def home():
+    return "Bot activo"
 
-bot.infinity_polling()
+
+def run_bot():
+    print("Bot iniciado...")
+    bot.infinity_polling()
+
+
+if __name__ == "__main__":
+
+    threading.Thread(target=run_bot).start()
+
+    port = int(os.environ.get("PORT", 10000))
+
+    app.run(host="0.0.0.0", port=port)
