@@ -81,25 +81,25 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
 application = ApplicationBuilder().token(TOKEN).build()
 
 conv_handler = ConversationHandler(
-    entry_points=[MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_fecha)],
+    entry_points=[CommandHandler("start", start)],
     states={PEDIR_FECHA: [MessageHandler(filters.TEXT & ~filters.COMMAND, recibir_fecha)]},
     fallbacks=[CommandHandler("cancelar", cancel)]
 )
 
-application.add_handler(CommandHandler("start", start))
 application.add_handler(conv_handler)
 
 # -------- FLASK WEBHOOK --------
 @app.route(f"/{TOKEN}", methods=["POST"])
 def webhook():
     update = Update.de_json(request.get_json(force=True), application.bot)
-    application.update_queue.put(update)
+    application.update_queue.put_nowait(update)  # <-- importante: put_nowait
     return "ok"
 
 @app.route("/")
 def index():
     return "Bot activo!"
 
-# -------- RUN --------
+# -------- RUN LOCAL PARA PRUEBAS --------
 if __name__ == "__main__":
-    application.run_polling()  # opcional para pruebas locales
+    # Solo para pruebas locales, comentar en producción
+    application.run_polling()
