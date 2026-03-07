@@ -7,6 +7,7 @@ from playwright.sync_api import sync_playwright
 import pandas as pd
 
 TOKEN = os.getenv("BOT_TOKEN")
+print("TOKEN cargado:", TOKEN)
 
 bot = telebot.TeleBot(TOKEN)
 
