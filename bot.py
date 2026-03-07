@@ -11,6 +11,7 @@ from telegram.ext import (
 )
 from playwright.sync_api import sync_playwright
 import pandas as pd
+import asyncio
 
 # ---------------- CONFIG ----------------
 TOKEN = os.getenv("BOT_TOKEN")
@@ -99,7 +100,12 @@ def webhook():
 def index():
     return "Bot activo!"
 
-# -------- RUN LOCAL PARA PRUEBAS --------
+# -------- INICIALIZAR BOT (Render) --------
+async def main():
+    await application.initialize()  # inicializa internamente
+    await application.start()       # empieza a escuchar
+    print("Bot listo para recibir webhooks...")
+
 if __name__ == "__main__":
-    # Solo para pruebas locales, comentar en Render
-    application.run_polling()
+    # Solo para pruebas locales
+    asyncio.run(main())
